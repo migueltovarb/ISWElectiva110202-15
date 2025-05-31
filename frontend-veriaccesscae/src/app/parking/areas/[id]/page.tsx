@@ -2,11 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import DashboardLayout from '../../../../../../components/layout/DashboardLayout';
-import { parkingService } from '../../../../../../lib/api';
-import { Button } from '../../../../../../components/ui/Button';
-import { Alert, AlertTitle, AlertDescription } from '../../../../../../components/ui/Alert';
-import { Loading } from '../../../../../../components/ui/Loading';
+import DashboardLayout from '@components/layout/DashboardLayout';
+import { Button } from '@components/ui/Button';
+import { Alert, AlertTitle, AlertDescription } from '@components/ui/Alert';
+import { Loading } from '@components/ui/Loading';
 import Link from 'next/link';
 
 interface FormData {
@@ -21,12 +20,28 @@ interface FormErrors {
   max_capacity?: string;
 }
 
+async function getParkingArea(id: string): Promise<FormData> {
+  const res = await fetch(`/api/parking/areas/${id}`);
+  if (!res.ok) throw new Error('No se pudo obtener el área');
+  return res.json();
+}
+
+async function updateParkingArea(id: string, data: FormData) {
+  const res = await fetch(`/api/parking/areas/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error('No se pudo actualizar el área');
+  return res.json();
+}
+
 export default function EditParkingAreaPage() {
   const [formData, setFormData] = useState<FormData>({
     name: '',
     description: '',
     max_capacity: 50,
-    is_active: true
+    is_active: true,
   });
   const [originalData, setOriginalData] = useState<FormData | null>(null);
   const [errors, setErrors] = useState<FormErrors>({});
@@ -34,31 +49,25 @@ export default function EditParkingAreaPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  
+
   const router = useRouter();
   const params = useParams();
   const areaId = params.id as string;
 
   useEffect(() => {
+    if (!areaId) return;
     fetchArea();
   }, [areaId]);
 
   const fetchArea = async () => {
     try {
       setLoading(true);
-      const area = await parkingService.getParkingArea(areaId);
-      
-      const areaData: FormData = {
-        name: area.name,
-        description: area.description || '',
-        max_capacity: area.max_capacity,
-        is_active: area.is_active
-      };
-      
-      setFormData(areaData);
-      setOriginalData(areaData);
+      const area = await getParkingArea(areaId);
+      setFormData(area);
+      setOriginalData(area);
+      setError('');
     } catch (err) {
-      console.error('Error fetching area:', err);
+      console.error(err);
       setError('No se pudo cargar la información del área');
     } finally {
       setLoading(false);
@@ -67,89 +76,72 @@ export default function EditParkingAreaPage() {
 
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {};
-    
+
     if (!formData.name.trim()) {
       newErrors.name = 'El nombre es requerido';
     } else if (formData.name.trim().length < 3) {
       newErrors.name = 'El nombre debe tener al menos 3 caracteres';
     }
-    
+
     if (!formData.max_capacity || formData.max_capacity < 1) {
       newErrors.max_capacity = 'La capacidad debe ser mayor a 0';
     } else if (formData.max_capacity > 10000) {
       newErrors.max_capacity = 'La capacidad no puede ser mayor a 10,000';
     }
-    
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
-    
-    const finalValue = type === 'checkbox' 
-      ? (e.target as HTMLInputElement).checked 
-      : type === 'number'
+
+    const finalValue =
+      type === 'checkbox'
+        ? (e.target as HTMLInputElement).checked
+        : type === 'number'
         ? parseInt(value) || 0
         : value;
-    
-    setFormData(prev => ({
+
+    setFormData((prev) => ({
       ...prev,
-      [name]: finalValue
+      [name]: finalValue,
     }));
-    
-    // Limpiar error del campo cuando el usuario empieza a escribir
+
     if (errors[name as keyof FormErrors]) {
-      setErrors(prev => ({
+      setErrors((prev) => ({
         ...prev,
-        [name]: undefined
+        [name]: undefined,
       }));
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!validateForm()) {
-      return;
-    }
-    
+
+    if (!validateForm()) return;
+
     setSaving(true);
     setError('');
     setSuccess('');
-    
+
     try {
-      await parkingService.updateParkingArea(areaId, formData);
+      await updateParkingArea(areaId, formData);
       setSuccess('Área actualizada correctamente');
-      
-      // Actualizar datos originales
       setOriginalData(formData);
-      
-      // Redireccionar después de un breve retraso
+
       setTimeout(() => {
         router.push('/parking/areas');
       }, 1500);
     } catch (err: any) {
-      console.error('Error updating area:', err);
-      
-      if (err.response?.data) {
-        if (typeof err.response.data === 'object') {
-          const errorMessages = Object.entries(err.response.data)
-            .map(([field, messages]) => `${field}: ${Array.isArray(messages) ? messages.join(', ') : messages}`)
-            .join('; ');
-          setError(errorMessages || 'Error al actualizar el área');
-        } else {
-          setError(err.response.data);
-        }
-      } else {
-        setError('Error al actualizar el área. Por favor, intente nuevamente.');
-      }
+      console.error(err);
+      setError(err.message || 'Error al actualizar el área');
     } finally {
       setSaving(false);
     }
   };
 
-  const hasChanges = () => {
+  const hasChanges = (): boolean => {
     if (!originalData) return false;
     return JSON.stringify(formData) !== JSON.stringify(originalData);
   };
@@ -158,6 +150,8 @@ export default function EditParkingAreaPage() {
     if (originalData) {
       setFormData(originalData);
       setErrors({});
+      setError('');
+      setSuccess('');
     }
   };
 
@@ -176,7 +170,7 @@ export default function EditParkingAreaPage() {
       <div className="max-w-3xl mx-auto space-y-6">
         <div className="flex justify-between items-center">
           <div className="flex items-center space-x-4">
-            <Link 
+            <Link
               href="/parking/areas"
               className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
             >
@@ -187,9 +181,7 @@ export default function EditParkingAreaPage() {
             </Link>
             <div>
               <h1 className="text-2xl font-semibold text-gray-900">Editar Área de Estacionamiento</h1>
-              <p className="mt-1 text-sm text-gray-600">
-                Actualice la información del área
-              </p>
+              <p className="mt-1 text-sm text-gray-600">Actualice la información del área</p>
             </div>
           </div>
         </div>
@@ -200,7 +192,7 @@ export default function EditParkingAreaPage() {
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
-        
+
         {success && (
           <Alert variant="success">
             <AlertTitle>Éxito</AlertTitle>
@@ -230,9 +222,7 @@ export default function EditParkingAreaPage() {
                       }`}
                       placeholder="Ej: Estacionamiento Principal"
                     />
-                    {errors.name && (
-                      <p className="mt-1 text-sm text-red-600">{errors.name}</p>
-                    )}
+                    {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name}</p>}
                   </div>
                 </div>
 
@@ -247,17 +237,15 @@ export default function EditParkingAreaPage() {
                       name="max_capacity"
                       id="max_capacity"
                       required
-                      min="1"
-                      max="10000"
+                      min={1}
+                      max={10000}
                       value={formData.max_capacity}
                       onChange={handleChange}
                       className={`shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md ${
                         errors.max_capacity ? 'border-red-300' : ''
                       }`}
                     />
-                    {errors.max_capacity && (
-                      <p className="mt-1 text-sm text-red-600">{errors.max_capacity}</p>
-                    )}
+                    {errors.max_capacity && <p className="mt-1 text-sm text-red-600">{errors.max_capacity}</p>}
                   </div>
                 </div>
 
@@ -293,7 +281,9 @@ export default function EditParkingAreaPage() {
                       />
                     </div>
                     <div className="ml-3 text-sm">
-                      <label htmlFor="is_active" className="font-medium text-gray-700">Área activa</label>
+                      <label htmlFor="is_active" className="font-medium text-gray-700">
+                        Área activa
+                      </label>
                       <p className="text-gray-500">Indica si esta área está operativa</p>
                     </div>
                   </div>
@@ -304,17 +294,15 @@ export default function EditParkingAreaPage() {
               <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
                 <h4 className="text-sm font-medium text-blue-900 mb-2">Vista previa:</h4>
                 <p className="text-sm text-blue-700">
-                  <span className="font-semibold">Nombre:</span> {formData.name} | 
-                  <span className="font-semibold ml-2">Capacidad:</span> {formData.max_capacity} vehículos |
+                  <span className="font-semibold">Nombre:</span> {formData.name} |{' '}
+                  <span className="font-semibold ml-2">Capacidad:</span> {formData.max_capacity} vehículos |{' '}
                   <span className="font-semibold ml-2">Estado:</span> {formData.is_active ? 'Activa' : 'Inactiva'}
                 </p>
               </div>
 
               {hasChanges() && (
                 <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
-                  <p className="text-sm text-yellow-800">
-                    Tienes cambios sin guardar
-                  </p>
+                  <p className="text-sm text-yellow-800">Tienes cambios sin guardar</p>
                 </div>
               )}
 
@@ -326,12 +314,7 @@ export default function EditParkingAreaPage() {
                   Cancelar
                 </Link>
                 {hasChanges() && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleReset}
-                    disabled={saving}
-                  >
+                  <Button type="button" variant="outline" onClick={handleReset} disabled={saving}>
                     Deshacer cambios
                   </Button>
                 )}

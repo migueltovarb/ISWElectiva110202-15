@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import DashboardLayout from '../../../components/layout/DashboardLayout';
+import DashboardLayout from '../components/layout/DashboardLayout';
 import { reportService } from '../../../lib/api';
 import Link from 'next/link';
 import { formatDate } from '../../../lib/utils';

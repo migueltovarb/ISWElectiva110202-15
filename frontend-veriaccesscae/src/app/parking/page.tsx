@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import DashboardLayout from '../../../components/layout/DashboardLayout';
+import DashboardLayout from '../components/layout/DashboardLayout';
 import { parkingService } from '../../../lib/api';
-import { Loading } from '../../../components/ui/Loading';
+import { Loading } from '../components/ui/Loading';
 import { formatDateTime } from '../../../lib/utils';
 import Link from 'next/link';
 

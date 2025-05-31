@@ -4,9 +4,9 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { accessService } from '../../../../../../lib/api';
-import { Button } from '../../../../../../components/ui/Button';
-import { Alert, AlertTitle } from '../../../../../../components/ui/Alert';
-import { Badge } from '../../../../../../components/ui/Badge';
+import { Button } from '../../../../components/ui/Button';
+import { Alert, AlertTitle } from '../../../../components/ui/Alert';
+import { Badge } from '../../../../components/ui/Badge';
 
 interface Visitor {
   id: number;

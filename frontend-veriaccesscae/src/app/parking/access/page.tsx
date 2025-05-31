@@ -2,11 +2,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import DashboardLayout from '../../../../components/layout/DashboardLayout';
+import DashboardLayout from '../../components/layout/DashboardLayout';
 import { parkingService } from '../../../../lib/api';
-import { Button } from '../../../../components/ui/Button';
-import { Alert, AlertTitle, AlertDescription } from '../../../../components/ui/Alert';
-import { Loading } from '../../../../components/ui/Loading';
+import { Button } from '../../components/ui/Button';
+import { Alert, AlertTitle, AlertDescription } from '../../components/ui/Alert';
+import { Loading } from '../../components/ui/Loading';
 import { formatDate } from '../../../../lib/utils';
 import { isAdmin } from '../../../../lib/auth';
 

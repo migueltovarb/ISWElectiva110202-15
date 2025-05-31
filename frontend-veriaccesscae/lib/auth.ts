@@ -6,47 +6,48 @@ interface JwtToken {
   [key: string]: any;
 }
 
-// Actualizada la interfaz User para incluir todas las propiedades necesarias
+interface UserRole {
+  id: number;
+  name: string;
+}
+
 interface User {
   id: number;
   username: string;
   first_name?: string;
   last_name?: string;
   email?: string;
-  phone?: string; // Añadida la propiedad phone
+  phone?: string;
   is_staff?: boolean;
   is_superuser?: boolean;
   is_active?: boolean;
   date_joined?: string;
   last_login?: string;
-  role?: {
-    id: number;
-    name: string;
-  };
-  [key: string]: any; // Para permitir propiedades adicionales
+  role?: UserRole;
+  [key: string]: any;
 }
+
+const isBrowser = typeof window !== 'undefined';
 
 /**
  * Retrieves the access token from localStorage
  */
 export function getToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem('access_token');
+  return isBrowser ? localStorage.getItem('access_token') : null;
 }
 
 /**
  * Retrieves the refresh token from localStorage
  */
 export function getRefreshToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem('refresh_token');
+  return isBrowser ? localStorage.getItem('refresh_token') : null;
 }
 
 /**
  * Stores the access and refresh tokens in localStorage
  */
 export function setTokens(access: string, refresh: string): void {
-  if (typeof window === 'undefined') return;
+  if (!isBrowser) return;
   localStorage.setItem('access_token', access);
   localStorage.setItem('refresh_token', refresh);
 }
@@ -55,7 +56,7 @@ export function setTokens(access: string, refresh: string): void {
  * Removes the tokens from localStorage
  */
 export function removeTokens(): void {
-  if (typeof window === 'undefined') return;
+  if (!isBrowser) return;
   localStorage.removeItem('access_token');
   localStorage.removeItem('refresh_token');
   localStorage.removeItem('user');
@@ -67,12 +68,12 @@ export function removeTokens(): void {
 export function isAuthenticated(): boolean {
   const token = getToken();
   if (!token) return false;
-  
+
   try {
     const decoded = jwtDecode<JwtToken>(token);
     const currentTime = Date.now() / 1000;
     return decoded.exp > currentTime;
-  } catch (error) {
+  } catch {
     return false;
   }
 }
@@ -81,14 +82,14 @@ export function isAuthenticated(): boolean {
  * Retrieves the current user from localStorage
  */
 export function getCurrentUser(): User | null {
-  if (typeof window === 'undefined') return null;
-  
+  if (!isBrowser) return null;
+
   const userStr = localStorage.getItem('user');
   if (!userStr) return null;
-  
+
   try {
     return JSON.parse(userStr) as User;
-  } catch (error) {
+  } catch {
     return null;
   }
 }
@@ -97,7 +98,7 @@ export function getCurrentUser(): User | null {
  * Stores the user in localStorage
  */
 export function setCurrentUser(user: User): void {
-  if (typeof window === 'undefined') return;
+  if (!isBrowser) return;
   localStorage.setItem('user', JSON.stringify(user));
 }
 
@@ -106,8 +107,7 @@ export function setCurrentUser(user: User): void {
  */
 export function hasRole(roleName: string): boolean {
   const user = getCurrentUser();
-  if (!user || !user.role) return false;
-  return user.role.name === roleName;
+  return !!(user?.role?.name === roleName);
 }
 
 /**
@@ -116,7 +116,12 @@ export function hasRole(roleName: string): boolean {
 export function isAdmin(): boolean {
   const user = getCurrentUser();
   if (!user) return false;
-  return user.is_staff || user.is_superuser || hasRole('Administrator');
+
+  return (
+    !!user.is_staff ||
+    !!user.is_superuser ||
+    hasRole('Administrator')
+  );
 }
 
 /**

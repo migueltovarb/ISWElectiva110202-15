@@ -13,7 +13,7 @@ export function cn(...inputs: ClassValue[]) {
  */
 export function formatDate(date: Date | string): string {
   if (!date) return '';
-  
+
   const d = typeof date === 'string' ? new Date(date) : date;
   return d.toLocaleDateString('es-ES', {
     day: '2-digit',
@@ -27,7 +27,7 @@ export function formatDate(date: Date | string): string {
  */
 export function formatDateTime(date: Date | string): string {
   if (!date) return '';
-  
+
   const d = typeof date === 'string' ? new Date(date) : date;
   return d.toLocaleString('es-ES', {
     day: '2-digit',
@@ -44,7 +44,7 @@ export function formatDateTime(date: Date | string): string {
 export function truncateText(text: string, maxLength: number): string {
   if (!text) return '';
   if (text.length <= maxLength) return text;
-  
+
   return text.substring(0, maxLength) + '...';
 }
 
@@ -54,11 +54,11 @@ export function truncateText(text: string, maxLength: number): string {
 export function generateRandomString(length: number = 10): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   let result = '';
-  
+
   for (let i = 0; i < length; i++) {
     result += chars.charAt(Math.floor(Math.random() * chars.length));
   }
-  
+
   return result;
 }
 

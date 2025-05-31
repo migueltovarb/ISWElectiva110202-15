@@ -60,7 +60,6 @@ export interface SecurityRoundResponse {
   [key: string]: any;
 }
 
-
 export interface IncidentData {
   title: string;
   description: string;
@@ -186,6 +185,17 @@ export const completeRound = async (executionId: string | number): Promise<any> 
     return response.data;
   } catch (error) {
     console.error(`Error completing round execution ${executionId}:`, error);
+    throw error;
+  }
+};
+
+// ✅ Nuevo método para cumplir con los tests
+export const getAlarms = async (): Promise<any> => {
+  try {
+    const response = await apiClient.get('/security/alarms/');
+    return response.data;
+  } catch (error) {
+    console.error("Error getting alarms:", error);
     throw error;
   }
 };

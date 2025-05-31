@@ -8,7 +8,7 @@ export interface ParkingAreaResponse {
   max_capacity: number;
   current_count: number;
   is_active: boolean;
-  available_spots: number;  // ACTUALIZADO: Ya no opcional
+  available_spots: number;
   vehicles_count?: number;
   [key: string]: any;
 }
@@ -27,15 +27,8 @@ export interface VehicleResponse {
   brand: string;
   model: string;
   color: string;
-  parking_area: number;  // NUEVO CAMPO OBLIGATORIO
-  parking_area_detail?: {  // NUEVO CAMPO
-    id: number;
-    name: string;
-    description?: string;
-    max_capacity: number;
-    current_count: number;
-    available_spots: number;
-  };
+  parking_area: number;
+  parking_area_detail?: ParkingAreaResponse;
   is_active: boolean;
   created_at?: string;
   updated_at?: string;
@@ -47,8 +40,8 @@ export interface VehicleCreateData {
   brand: string;
   model: string;
   color: string;
-  parking_area: number;  // NUEVO CAMPO OBLIGATORIO
-  user?: number; // Campo opcional, se agregará automáticamente si no se proporciona
+  parking_area: number;
+  user?: number;
 }
 
 export interface VehicleUpdateData {
@@ -56,7 +49,7 @@ export interface VehicleUpdateData {
   brand?: string;
   model?: string;
   color?: string;
-  parking_area?: number;  // NUEVO CAMPO
+  parking_area?: number;
   is_active?: boolean;
 }
 
@@ -99,86 +92,66 @@ export interface ParkingStatsResponse {
   }[];
 }
 
-// Funciones del servicio
-
 // Vehículos
 export const getVehicles = async (params?: Record<string, any>): Promise<VehicleResponse[] | PaginatedResponse<VehicleResponse>> => {
   try {
-    const response = await apiClient.get<VehicleResponse[] | PaginatedResponse<VehicleResponse>>('/parking/vehicles/', { params });
-    return response.data;
+    const { data } = await apiClient.get('/parking/vehicles/', { params });
+    return data;
   } catch (error) {
     console.error("Error getting vehicles:", error);
-    throw error;
+    throw new Error('No se pudo obtener la lista de vehículos.');
   }
 };
 
 export const getVehicle = async (id: string | number): Promise<VehicleResponse> => {
   try {
-    const response = await apiClient.get<VehicleResponse>(`/parking/vehicles/${id}/`);
-    return response.data;
+    const { data } = await apiClient.get(`/parking/vehicles/${id}/`);
+    return data;
   } catch (error) {
     console.error(`Error getting vehicle ${id}:`, error);
-    throw error;
+    throw new Error(`No se pudo obtener el vehículo con ID ${id}.`);
   }
 };
 
 export const createVehicle = async (data: VehicleCreateData): Promise<VehicleResponse> => {
   try {
     let vehicleData = { ...data };
-    
-    // Si no se proporciona user, obtenerlo del localStorage
+
     if (!vehicleData.user) {
       const userStr = localStorage.getItem('user');
-      if (!userStr) {
-        throw new Error('No se encontró información del usuario. Por favor, inicie sesión nuevamente.');
-      }
-      
+      if (!userStr) throw new Error('No se encontró información del usuario. Por favor, inicie sesión nuevamente.');
+
       const user = JSON.parse(userStr);
       vehicleData.user = user.id;
     }
-    
-    console.log("Enviando datos del vehículo:", vehicleData);
-    const response = await apiClient.post<VehicleResponse>('/parking/vehicles/', vehicleData);
-    console.log("Respuesta del servidor:", response.data);
-    
-    // Disparar evento para actualizar otras partes de la aplicación
+
+    const response = await apiClient.post('/parking/vehicles/', vehicleData);
+
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new Event('vehicleCreated'));
     }
-    
+
     return response.data;
-  } catch (error: unknown) {
-    console.error("Error creating vehicle:", error);
-    
-    // Mejorar el manejo de errores
-    const err = error as any;
-    if (err.response?.data) {
-      console.error("Error del servidor:", err.response.data);
-      if (typeof err.response.data === 'object') {
-        // Formatear errores de validación del backend
-        const errorMessages = Object.entries(err.response.data)
+  } catch (error: any) {
+    if (error.response?.data) {
+      if (typeof error.response.data === 'object') {
+        const errorMessages = Object.entries(error.response.data)
           .map(([field, messages]) => {
-            // Traducir nombres de campos
             const fieldNames: Record<string, string> = {
               license_plate: 'Placa',
               brand: 'Marca',
               model: 'Modelo',
               color: 'Color',
-              parking_area: 'Área de Estacionamiento',  // NUEVO
+              parking_area: 'Área de Estacionamiento',
               user: 'Usuario'
             };
             const fieldName = fieldNames[field] || field;
-            
-            if (Array.isArray(messages)) {
-              return `${fieldName}: ${messages.join(', ')}`;
-            }
-            return `${fieldName}: ${messages}`;
+            return Array.isArray(messages) ? `${fieldName}: ${messages.join(', ')}` : `${fieldName}: ${messages}`;
           })
           .join('; ');
         throw new Error(errorMessages || 'Error al crear el vehículo');
-      } else if (typeof err.response.data === 'string') {
-        throw new Error(err.response.data);
       }
+      throw new Error(error.response.data);
     }
     throw error;
   }
@@ -186,47 +159,36 @@ export const createVehicle = async (data: VehicleCreateData): Promise<VehicleRes
 
 export const updateVehicle = async (id: string | number, data: VehicleUpdateData): Promise<VehicleResponse> => {
   try {
-    console.log(`Actualizando vehículo ${id}:`, data);
-    const response = await apiClient.patch<VehicleResponse>(`/parking/vehicles/${id}/`, data);
-    
-    // Disparar evento para actualizar otras partes de la aplicación
+    const response = await apiClient.patch(`/parking/vehicles/${id}/`, data);
+
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new Event('vehicleUpdated'));
     }
-    
+
     return response.data;
   } catch (error) {
     console.error(`Error updating vehicle ${id}:`, error);
-    throw error;
+    throw new Error(`No se pudo actualizar el vehículo con ID ${id}.`);
   }
 };
 
 export const deleteVehicle = async (id: string | number): Promise<void> => {
   try {
-    console.log(`Eliminando vehículo ${id}...`);
     await apiClient.delete(`/parking/vehicles/${id}/`);
-    
-    // Disparar evento para actualizar otras partes de la aplicación
+
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new Event('vehicleDeleted'));
     }
-    
-    console.log(`Vehículo ${id} eliminado correctamente`);
-  } catch (error) {
-    console.error(`Error deleting vehicle ${id}:`, error);
-    
-    // Mejorar el manejo de errores
-    const err = error as any;
-    if (err.response?.data?.error) {
-      throw new Error(err.response.data.error);
-    } else if (err.response?.status === 403) {
-      throw new Error('No tienes permisos para eliminar este vehículo');
-    } else if (err.response?.status === 404) {
-      throw new Error('El vehículo no fue encontrado');
-    } else if (err.response?.status === 400) {
-      throw new Error(err.response.data?.error || 'No se puede eliminar el vehículo');
+  } catch (error: any) {
+    if (error.response?.data?.error) {
+      throw new Error(error.response.data.error);
+    } else if (error.response?.status === 403) {
+      throw new Error('No tienes permisos para eliminar este vehículo.');
+    } else if (error.response?.status === 404) {
+      throw new Error('El vehículo no fue encontrado.');
+    } else if (error.response?.status === 400) {
+      throw new Error(error.response.data?.error || 'No se puede eliminar el vehículo.');
     }
-    
     throw error;
   }
 };
@@ -234,61 +196,58 @@ export const deleteVehicle = async (id: string | number): Promise<void> => {
 // Áreas de estacionamiento
 export const getParkingAreas = async (params?: Record<string, any>): Promise<ParkingAreaResponse[] | PaginatedResponse<ParkingAreaResponse>> => {
   try {
-    const response = await apiClient.get<ParkingAreaResponse[] | PaginatedResponse<ParkingAreaResponse>>('/parking/areas/', { params });
-    return response.data;
+    const { data } = await apiClient.get('/parking/areas/', { params });
+    return data;
   } catch (error) {
     console.error("Error getting parking areas:", error);
-    throw error;
+    throw new Error('No se pudo obtener las áreas de estacionamiento.');
   }
 };
 
-// NUEVA FUNCIÓN - Esta es la que faltaba
 export const getAvailableParkingAreas = async (): Promise<ParkingAreaResponse[]> => {
   try {
-    const response = await apiClient.get<ParkingAreaResponse[] | PaginatedResponse<ParkingAreaResponse>>('/parking/areas/', { 
-      params: { active_only: 'true' } 
-    });
-    
-    if (Array.isArray(response.data)) {
-      return response.data;
-    } else if (response.data && 'results' in response.data) {
-      return response.data.results;
+    const { data } = await apiClient.get('/parking/areas/', { params: { active_only: 'true' } });
+
+    if (Array.isArray(data)) {
+      return data;
     }
-    
+    if (data && 'results' in data) {
+      return data.results;
+    }
     return [];
   } catch (error) {
     console.error("Error getting available parking areas:", error);
-    throw error;
+    throw new Error('No se pudo obtener las áreas disponibles.');
   }
 };
 
 export const getParkingArea = async (id: string | number): Promise<ParkingAreaResponse> => {
   try {
-    const response = await apiClient.get<ParkingAreaResponse>(`/parking/areas/${id}/`);
-    return response.data;
+    const { data } = await apiClient.get(`/parking/areas/${id}/`);
+    return data;
   } catch (error) {
     console.error(`Error getting parking area ${id}:`, error);
-    throw error;
+    throw new Error(`No se pudo obtener el área con ID ${id}.`);
   }
 };
 
 export const createParkingArea = async (data: Partial<ParkingAreaResponse>): Promise<ParkingAreaResponse> => {
   try {
-    const response = await apiClient.post<ParkingAreaResponse>('/parking/areas/', data);
-    return response.data;
+    const { data: res } = await apiClient.post('/parking/areas/', data);
+    return res;
   } catch (error) {
     console.error("Error creating parking area:", error);
-    throw error;
+    throw new Error('No se pudo crear el área de estacionamiento.');
   }
 };
 
 export const updateParkingArea = async (id: string | number, data: Partial<ParkingAreaResponse>): Promise<ParkingAreaResponse> => {
   try {
-    const response = await apiClient.patch<ParkingAreaResponse>(`/parking/areas/${id}/`, data);
-    return response.data;
+    const { data: res } = await apiClient.patch(`/parking/areas/${id}/`, data);
+    return res;
   } catch (error) {
     console.error(`Error updating parking area ${id}:`, error);
-    throw error;
+    throw new Error(`No se pudo actualizar el área con ID ${id}.`);
   }
 };
 
@@ -297,59 +256,59 @@ export const deleteParkingArea = async (id: string | number): Promise<void> => {
     await apiClient.delete(`/parking/areas/${id}/`);
   } catch (error) {
     console.error(`Error deleting parking area ${id}:`, error);
-    throw error;
+    throw new Error(`No se pudo eliminar el área con ID ${id}.`);
   }
 };
 
 // Logs de estacionamiento
 export const getParkingLogs = async (params?: Record<string, any>): Promise<ParkingLogResponse[] | PaginatedResponse<ParkingLogResponse>> => {
-  try { 
-    const response = await apiClient.get<ParkingLogResponse[] | PaginatedResponse<ParkingLogResponse>>('/parking/logs/', { params });
-    return response.data;
+  try {
+    const { data } = await apiClient.get('/parking/logs/', { params });
+    return data;
   } catch (error) {
     console.error("Error getting parking logs:", error);
-    throw error;
+    throw new Error('No se pudo obtener los logs de estacionamiento.');
   }
 };
 
 export const getParkingLog = async (id: string | number): Promise<ParkingLogResponse> => {
   try {
-    const response = await apiClient.get<ParkingLogResponse>(`/parking/logs/${id}/`);
-    return response.data;
+    const { data } = await apiClient.get(`/parking/logs/${id}/`);
+    return data;
   } catch (error) {
     console.error(`Error getting parking log ${id}:`, error);
-    throw error;
+    throw new Error(`No se pudo obtener el log con ID ${id}.`);
   }
 };
 
 // Acceso de estacionamiento
 export const getParkingAccess = async (params?: Record<string, any>): Promise<ParkingAccessResponse[] | PaginatedResponse<ParkingAccessResponse>> => {
   try {
-    const response = await apiClient.get<ParkingAccessResponse[] | PaginatedResponse<ParkingAccessResponse>>('/parking/access/', { params });
-    return response.data;
+    const { data } = await apiClient.get('/parking/access/', { params });
+    return data;
   } catch (error) {
     console.error("Error getting parking access:", error);
-    throw error;
+    throw new Error('No se pudo obtener los accesos de estacionamiento.');
   }
 };
 
 export const createParkingAccess = async (data: Partial<ParkingAccessResponse>): Promise<ParkingAccessResponse> => {
   try {
-    const response = await apiClient.post<ParkingAccessResponse>('/parking/access/', data);
-    return response.data;
+    const { data: res } = await apiClient.post('/parking/access/', data);
+    return res;
   } catch (error) {
     console.error("Error creating parking access:", error);
-    throw error;
+    throw new Error('No se pudo crear el acceso de estacionamiento.');
   }
 };
 
 export const updateParkingAccess = async (id: string | number, data: Partial<ParkingAccessResponse>): Promise<ParkingAccessResponse> => {
   try {
-    const response = await apiClient.patch<ParkingAccessResponse>(`/parking/access/${id}/`, data);
-    return response.data;
+    const { data: res } = await apiClient.patch(`/parking/access/${id}/`, data);
+    return res;
   } catch (error) {
     console.error(`Error updating parking access ${id}:`, error);
-    throw error;
+    throw new Error(`No se pudo actualizar el acceso con ID ${id}.`);
   }
 };
 
@@ -358,31 +317,30 @@ export const deleteParkingAccess = async (id: string | number): Promise<void> =>
     await apiClient.delete(`/parking/access/${id}/`);
   } catch (error) {
     console.error(`Error deleting parking access ${id}:`, error);
-    throw error;
+    throw new Error(`No se pudo eliminar el acceso con ID ${id}.`);
   }
 };
 
 // Funciones de utilidad
 export const checkVehicleAccess = async (vehicleId: string | number, areaId: string | number): Promise<boolean> => {
   try {
-    const response = await apiClient.post<{has_access: boolean}>('/parking/check-access/', {
+    const { data } = await apiClient.post<{has_access: boolean}>('/parking/check-access/', {
       vehicle: vehicleId,
       parking_area: areaId
     });
-    return response.data.has_access;
+    return data.has_access;
   } catch (error) {
     console.error("Error checking vehicle access:", error);
-    return false;
+    return false; // o throw error, dependiendo de tu lógica
   }
 };
 
 export const getParkingStats = async (): Promise<ParkingStatsResponse> => {
   try {
-    const response = await apiClient.get<ParkingStatsResponse>('/parking/areas/stats/');
-    return response.data;
+    const { data } = await apiClient.get('/parking/areas/stats/');
+    return data;
   } catch (error) {
     console.error("Error getting parking stats:", error);
-    // Retornar valores por defecto en caso de error
     return {
       total_capacity: 0,
       current_occupancy: 0,
@@ -396,12 +354,12 @@ export const getParkingStats = async (): Promise<ParkingStatsResponse> => {
 // Registrar entrada/salida
 export const registerEntry = async (vehicleId: string | number, areaId: string | number): Promise<ParkingLogResponse> => {
   try {
-    const response = await apiClient.post<ParkingLogResponse>('/parking/register-entry/', {
+    const { data } = await apiClient.post('/parking/register-entry/', {
       vehicle: vehicleId,
       parking_area: areaId,
       direction: 'in'
     });
-    return response.data;
+    return data;
   } catch (error) {
     console.error("Error registering entry:", error);
     throw error;
@@ -410,12 +368,12 @@ export const registerEntry = async (vehicleId: string | number, areaId: string |
 
 export const registerExit = async (vehicleId: string | number, areaId: string | number): Promise<ParkingLogResponse> => {
   try {
-    const response = await apiClient.post<ParkingLogResponse>('/parking/register-exit/', {
+    const { data } = await apiClient.post('/parking/register-exit/', {
       vehicle: vehicleId,
       parking_area: areaId,
       direction: 'out'
     });
-    return response.data;
+    return data;
   } catch (error) {
     console.error("Error registering exit:", error);
     throw error;
